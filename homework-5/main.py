@@ -1,5 +1,5 @@
 import json
-
+import re
 import psycopg2
 
 from config import config
@@ -42,16 +42,28 @@ def main():
 
 def create_database(params, db_name) -> None:
     """Создает новую базу данных."""
-    pass
+    try:
+        with psycopg2.connect(**params) as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"CREATE DATABASE {db_name}")
+    finally:
+        cur.close()
+
+
 
 def execute_sql_script(cur, script_file) -> None:
     """Выполняет скрипт из файла для заполнения БД данными."""
-
+    with open(script_file, 'r') as file:
+        for line in file:
+            # Проверка строки на комментарий
+            if not re.match(r'^\s*--', line):
+                cur.execute(line)
+    cur.close()
 
 
 def create_suppliers_table(cur) -> None:
     """Создает таблицу suppliers."""
-    pass
+    cur.execute("CREATE TABLE suppliers")
 
 
 def get_suppliers_data(json_file: str) -> list[dict]:
