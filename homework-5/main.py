@@ -1,5 +1,5 @@
 import json
-import re
+
 import psycopg2
 
 from config import config
@@ -10,7 +10,7 @@ def main():
     json_file = 'suppliers.json'
     db_name = 'my_new_db'
 
-    params = config()
+    params = config('database.ini')
     conn = None
 
     create_database(params, db_name)
@@ -42,43 +42,70 @@ def main():
 
 def create_database(params, db_name) -> None:
     """Создает новую базу данных."""
-    try:
-        with psycopg2.connect(**params) as conn:
-            with conn.cursor() as cur:
-                cur.execute(f"CREATE DATABASE {db_name}")
-    finally:
-        cur.close()
-
+    conn = psycopg2.connect(**params)
+    conn.autocommit = True
+    cur = conn.cursor()
+    cur.execute(f"CREATE DATABASE {db_name}")
+    cur.close()
+    conn.close()
 
 
 def execute_sql_script(cur, script_file) -> None:
     """Выполняет скрипт из файла для заполнения БД данными."""
-    with open(script_file, 'r') as file:
-        for line in file:
-            # Проверка строки на комментарий
-            if not re.match(r'^\s*--', line):
-                cur.execute(line)
-    cur.close()
+    with open(script_file, 'r', encoding='UTF-8') as file:
+        sql_commands = file.readlines()
+
+    for command in sql_commands:
+        command = command.strip()
+        if command.strip().startswith('--') or not command.strip():
+            continue
+        print(command)
+        cur.execute(command)
 
 
 def create_suppliers_table(cur) -> None:
     """Создает таблицу suppliers."""
-    cur.execute("CREATE TABLE suppliers")
+    create_table_query = """
+        CREATE TABLE suppliers (
+        supplier_id serial PRIMARY KEY,
+        company_name varchar,
+        contact varchar, 
+        address varchar,
+        phone varchar,
+        fax varchar,
+        homepage varchar,
+        products text[]
+        )
+    """
+    cur.execute(create_table_query)
 
 
 def get_suppliers_data(json_file: str) -> list[dict]:
     """Извлекает данные о поставщиках из JSON-файла и возвращает список словарей с соответствующей информацией."""
-    pass
+    with open(json_file, 'r') as file:
+        read_file = json.load(file)
+        return read_file
 
 
 def insert_suppliers_data(cur, suppliers: list[dict]) -> None:
     """Добавляет данные из suppliers в таблицу suppliers."""
-    pass
+    insert_query = '''
+        INSERT INTO suppliers (company_name, contact, address, phone, fax, homepage, products)
+        VALUES (%(company_name)s, %(contact)s, %(address)s, %(phone)s, %(fax)s, %(homepage)s, %(products)s)
+    '''
+    cur.executemany(insert_query, suppliers)
 
 
 def add_foreign_keys(cur, json_file) -> None:
     """Добавляет foreign key со ссылкой на supplier_id в таблицу products."""
     pass
+    # alter_table_query = f"""
+    #             ALTER TABLE suppliers
+    #             ADD CONSTRAINT fk_suppliers_products
+    #             FOREIGN KEY (supplier_id)
+    #             REFERENCES products(supplier_id);
+    #         """
+    # cur.execute(alter_table_query)
 
 
 if __name__ == '__main__':
